@@ -1,33 +1,240 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Iframe Példa</title>
-    <style>
-        .iframe-container {
-            position: relative;
-            overflow: hidden;
-        }
+  <meta charset="UTF-8" />
+<style>
+  :root {
+    --bg: #000;
+    --text: #fff;
+    --msg-shadow: rgba(0,0,0,0.25);
+  }
 
-        .iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-    </style>
+  body.light {
+    --bg: #fff;
+    --text: #000;
+    --msg-shadow: rgba(0,0,0,0.1);
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    color: var(--text);
+    transition: background 0.3s, color 0.3s;
+  }
+
+  #themeToggle {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--text);
+    color: var(--bg);
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    z-index: 9999;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  #chat {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: clamp(14px, 2vw, 18px);
+    max-height: 100vh;
+    overflow-y: auto;
+    word-break: break-word;
+  }
+
+  .msg {
+    padding: 8px 12px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px var(--msg-shadow);
+    color: var(--text);
+    animation: fadeIn 1s ease-out;
+    max-width: 100%;
+    word-wrap: break-word;
+    font-weight: 500;
+    white-space: normal;
+    box-sizing: border-box;
+    overflow-wrap: break-word;
+  }
+
+  .msg img {
+    vertical-align: middle;
+    margin: 0 2px;
+    max-height: 20px;
+    max-width: 100%;
+    object-fit: contain;
+  }
+
+  .msg img[src*="dlivecdn.com/emote/"] {
+    max-height: 75px;
+    max-width: 75px;
+    object-fit: contain;
+  }
+
+  .twitch {
+    background: rgba(145, 70, 255, 0.22);
+    border-left: 4px solid rgba(145, 70, 255, 0.55);
+    backdrop-filter: blur(4px);
+  }
+
+  .youTube {
+    background: rgba(255, 0, 0, 0.22);
+    border-left: 4px solid rgba(255, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+  }
+
+  .kick {
+    background: rgba(83, 252, 24, 0.22);
+    border-left: 4px solid rgba(83, 252, 24, 0.22);
+    backdrop-filter: blur(4px);
+  }
+
+  .dlive {
+    background: rgba(249, 213, 55, 0.22);
+    border-left: 4px solid rgba(249, 213, 55, 0.55);
+    backdrop-filter: blur(4px);
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
 </head>
-<body>
-<div class="iframe-container" style="width: 839px; height: 462px; position: relative; margin: 0 auto;">
-  <iframe class="i-frame" src="https://tidylabs.stream/chat.asp?key=DA3HA4DK9ZQO0XBUWZ17Z90447618" frameborder="0"></iframe>
-</div>
-<div style="display: flex; width: 839px; margin: 0 auto;">
-  <div class="iframe-container" style="width: 419px; height: 462px; position: relative;">
-    <iframe class="i-frame" src="https://botrix.live/widgets/chat?bid=v9JP3S2FvUk2FqQ1o1PtFTOQRbots=true&emojis=true&hideCommands=true&hideMessages=false" frameborder="0"></iframe>
-  </div>
-  <div class="iframe-container" style="width: 419px; height: 462px; position: relative;">
-    <iframe class="i-frame" src="DLIVE CHAT URL IDE" frameborder="0"></iframe>
-  </div>
-</div>
-</body>
 
+<body>
+  <button id="themeToggle">Light Mode</button>
+  <div id="chat"></div>
+
+<script>
+  // THEME TOGGLE
+  const toggleBtn = document.getElementById("themeToggle");
+  toggleBtn.onclick = () => {
+    document.body.classList.toggle("light");
+    toggleBtn.textContent = document.body.classList.contains("light")
+      ? "Dark Mode"
+      : "Light Mode";
+  };
+
+  // CHAT LOGIC
+  const chat = document.getElementById("chat");
+  const seenIds = new Set();
+
+  function formatTimeFromObjectId(id) {
+    const timestamp = new Date(parseInt(id.substring(0, 8), 16) * 1000);
+    const h = timestamp.getHours().toString().padStart(2, "0");
+    const m = timestamp.getMinutes().toString().padStart(2, "0");
+    return `${h}:${m}`;
+  }
+
+  function addMessage(msg) {
+    if (seenIds.has(msg._id)) return;
+    seenIds.add(msg._id);
+
+    const div = document.createElement("div");
+    const platformClass = (msg.platform || "").toLowerCase();
+    div.className = `msg ${platformClass}`;
+
+    const time = formatTimeFromObjectId(msg._id.toString());
+
+    let badgeHTML = "";
+    if (Array.isArray(msg.badges)) {
+      badgeHTML = msg.badges.map(b =>
+        `<img src="${b.src}" alt="${b.alt}" title="${b.alt}" style="height:16px;margin-right:4px;">`
+      ).join("");
+    }
+
+    let renderedMessage = msg.message
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    let visuals = [];
+
+    const isDLiveStickerOnly =
+      msg.platform?.toLowerCase() === "dlive" &&
+      (!msg.message || msg.message.trim() === "") &&
+      Array.isArray(msg.emote) &&
+      msg.emote.length > 0;
+
+    if (isDLiveStickerOnly) {
+      visuals = msg.emote;
+      renderedMessage = visuals
+        .map(v => `<img src="${v.src}" alt="${v.alt}" title="${v.alt}">`)
+        .join(" ");
+    } else {
+      visuals = [...(msg.emote || []), ...(msg.stickers || [])];
+
+      visuals.forEach(v => {
+        const variants = [v.alt, `:${v.alt}`, v.alt.replace(/^:/, "")];
+        const imgTag = `<img src="${v.src}" alt="${v.alt}" title="${v.alt}" style="height:20px;vertical-align:middle;">`;
+
+        variants.forEach(variant => {
+          const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          renderedMessage = renderedMessage.replace(
+            new RegExp(`\\b${escaped}\\b`, "gi"),
+            imgTag
+          );
+        });
+      });
+    }
+
+    div.innerHTML = `${badgeHTML}[${time}] <strong>${msg.username}</strong>: ${renderedMessage}`;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+
+    if (chat.children.length > 80) {
+      chat.removeChild(chat.firstChild);
+    }
+  }
+
+  const host = window.location.hostname;
+
+  fetch(`http://127.0.0.1:64581/messages`)
+    .then(res => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    })
+    .then(data => {
+      data.sort((a,b) => {
+        const ta = parseInt(a._id.substring(0, 8), 16);
+        const tb = parseInt(b._id.substring(0, 8), 16);
+        return ta - tb;
+      });
+      data.forEach(addMessage);
+    })
+    .catch(err => {
+      console.error("Failed to load messages:", err);
+      chat.innerHTML = `<div style="color:red;">Error loading messages: ${err.message}</div>`;
+    });
+
+  const stream = new EventSource(`http://127.0.0.1:64581/stream`);
+  stream.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      addMessage(msg);
+    } catch (err) {
+      console.error("Stream parse error:", err);
+    }
+  };
+  stream.onerror = (err) => {
+    console.error("SSE connection failed:", err);
+  };
+</script>
+</body>
+</html>
